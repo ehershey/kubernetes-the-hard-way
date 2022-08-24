@@ -1,8 +1,8 @@
 # Provisioning Compute Resources
 
-Kubernetes requires a set of machines to host the Kubernetes control plane and the worker nodes where containers are ultimately run. In this lab you will provision the compute resources required for running a secure and highly available Kubernetes cluster across a single [compute zone](https://cloud.google.com/compute/docs/regions-zones/regions-zones).
+Kubernetes requires a set of machines to host the Kubernetes control plane and the worker nodes where containers are ultimately run. In this lab you will provision the compute resources required for running a secure and highly available Kubernetes cluster across a single [AWS Region](https://aws.amazon.com/about-aws/global-infrastructure/regions_az/).
 
-> Ensure a default compute zone and region have been set as described in the [Prerequisites](01-prerequisites.md#set-a-default-compute-region-and-zone) lab.
+> Ensure a default AWS Region has been set as described in the [Prerequisites](01-prerequisites.md#set-a-default-compute-region-and-zone) lab.
 
 ## Networking
 
@@ -12,38 +12,86 @@ The Kubernetes [networking model](https://kubernetes.io/docs/concepts/cluster-ad
 
 ### Virtual Private Cloud Network
 
-In this section a dedicated [Virtual Private Cloud](https://cloud.google.com/compute/docs/networks-and-firewalls#networks) (VPC) network will be setup to host the Kubernetes cluster.
+In this section a dedicated [Virtual Private Cloud](https://aws.amazon.com/vpc/) (VPC) network will be setup to host the Kubernetes cluster.
 
-Create the `kubernetes-the-hard-way` custom VPC network:
+Create a custom VPC network:
 
 ```
-gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+export VPC=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --query Vpc.VpcId --output text)
+echo $VPC
+# vpc-0d8afe938a9303739
+
 ```
 
 A [subnet](https://cloud.google.com/compute/docs/vpc/#vpc_networks_and_subnets) must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
 
-Create the `kubernetes` subnet in the `kubernetes-the-hard-way` VPC network:
+Create a public subnet inside of that VPC network:
 
 ```
-gcloud compute networks subnets create kubernetes \
-  --network kubernetes-the-hard-way \
-  --range 10.240.0.0/24
-```
-
-> The `10.240.0.0/24` IP address range can host up to 254 compute instances.
-
-### Firewall Rules
-
-Create a firewall rule that allows internal communication across all protocols:
+export SUBNET=$(aws ec2 create-subnet --vpc-id $VPC --cidr-block 10.0.1.0/24 --query Subnet.SubnetId --output text)
+echo $SUBNET
+# subnet-0d6f9fc23c2a159da
 
 ```
-gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
-  --allow tcp,udp,icmp \
-  --network kubernetes-the-hard-way \
-  --source-ranges 10.240.0.0/24,10.200.0.0/16
+
+> The `10.0.1.0/24` IP address range can host up to 254 compute instances.
+
+### Routing & Firewall
+
+Create an internet gateway and attach it to the VPC network:
+
+```
+export INTERNETGW=$(aws ec2 create-internet-gateway --query InternetGateway.InternetGatewayId --output text)
+aws ec2 attach-internet-gateway --vpc-id $VPC --internet-gateway-id $INTERNETGW
 ```
 
-Create a firewall rule that allows external SSH, ICMP, and HTTPS:
+Create and attach a route table that tells instnces in that subnet to use the internet gateway:
+
+```
+export ROUTETABLE=$(aws ec2 create-route-table --vpc-id $VPC --query RouteTable.RouteTableId --output text)
+echo $ROUTETABLE
+# rtb-02c3ef4e030f0d5b2
+aws ec2 create-route --route-table-id $ROUTETABLE --destination-cidr-block 0.0.0.0/0 --gateway-id $INTERNETGW
+```
+
+Verify that the route table is associated with the VPC network:
+
+```
+aws ec2 describe-route-tables --route-table-id $ROUTETABLE
+```
+
+> output
+
+```
+{
+    "RouteTables": [
+        {
+            "Associations": [],
+            "PropagatingVgws": [],
+            "RouteTableId": "rtb-02c3ef4e030f0d5b2",
+            "Routes": [
+                {
+                    "DestinationCidrBlock": "10.0.0.0/16",
+                    "GatewayId": "local",
+                    "Origin": "CreateRouteTable",
+                    "State": "active"
+                },
+                {
+                    "DestinationCidrBlock": "0.0.0.0/0",
+                    "GatewayId": "igw-01eef992992af026b",
+                    "Origin": "CreateRoute",
+                    "State": "active"
+                }
+            ],
+            "Tags": [],
+            "VpcId": "vpc-0d8afe938a9303739",
+            "OwnerId": "677745302030" // TODO
+        }
+    ]
+}
+```
+
+Create a security group that allows external SSH, ICMP, and HTTPS:
 
 ```
 gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
@@ -217,6 +265,7 @@ Type `exit` at the prompt to exit the `controller-0` compute instance:
 ```
 $USER@controller-0:~$ exit
 ```
+
 > output
 
 ```

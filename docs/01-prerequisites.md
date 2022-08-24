@@ -1,54 +1,36 @@
 # Prerequisites
 
-## Google Cloud Platform
+## AWS
 
-This tutorial leverages the [Google Cloud Platform](https://cloud.google.com/) to streamline provisioning of the compute infrastructure required to bootstrap a Kubernetes cluster from the ground up. [Sign up](https://cloud.google.com/free/) for $300 in free credits.
+This tutorial leverages [Amazon Web Services](https://aws.amazon.com//) to streamline provisioning of the compute infrastructure required to bootstrap a Kubernetes cluster from the ground up. This will cost you money; if that's a concern consider instead using the original [Google Cloud version](https://github.com/kelseyhightower/kubernetes-the-hard-way) of this tutorial, as Google offers $300 in free credits.
 
 [Estimated cost](https://cloud.google.com/products/calculator#id=873932bc-0840-4176-b0fa-a8cfd4ca61ae) to run this tutorial: $0.23 per hour ($5.50 per day).
 
-> The compute resources required for this tutorial exceed the Google Cloud Platform free tier.
+> The compute resources required for this tutorial exceed the AWS free tier.
 
-## Google Cloud Platform SDK
+## AWS CLI
 
-### Install the Google Cloud SDK
+### Install the AWS CLI
 
-Follow the Google Cloud SDK [documentation](https://cloud.google.com/sdk/) to install and configure the `gcloud` command line utility.
+Follow the AWS [documentation](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install and configure the `aws` command line utility.
 
-Verify the Google Cloud SDK version is 338.0.0 or higher:
+Verify the AWS CLI version is 2.7.19 or higher:
 
 ```
-gcloud version
+aws version
 ```
 
 ### Set a Default Compute Region and Zone
 
-This tutorial assumes a default compute region and zone have been configured.
+This tutorial assumes a default account and region have been configured in your AWS CLI configuration.
 
-If you are using the `gcloud` command-line tool for the first time `init` is the easiest way to do this:
+If you are using the `aws` command-line tool for the first time `configure` is the easiest way to do this:
 
 ```
-gcloud init
+aws configure
 ```
 
 Then be sure to authorize gcloud to access the Cloud Platform with your Google user credentials:
-
-```
-gcloud auth login
-```
-
-Next set a default compute region and compute zone:
-
-```
-gcloud config set compute/region us-west1
-```
-
-Set a default compute zone:
-
-```
-gcloud config set compute/zone us-west1-c
-```
-
-> Use the `gcloud compute zones list` command to view additional regions and zones.
 
 ## Running Commands in Parallel with tmux
 
