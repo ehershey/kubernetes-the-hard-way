@@ -16,8 +16,13 @@ kubectl create secret generic kubernetes-the-hard-way \
 Print a hexdump of the `kubernetes-the-hard-way` secret stored in etcd:
 
 ```
-gcloud compute ssh controller-0 \
-  --command "sudo ETCDCTL_API=3 etcdctl get \
+external_ip=$(aws ec2 describe-instances --filters \
+  "Name=tag:Name,Values=controller-0" \
+  "Name=instance-state-name,Values=running" \
+  --output text --query 'Reservations[].Instances[].PublicIpAddress')
+
+ssh -i kubernetes.rsa ubuntu@${external_ip} \
+ "sudo ETCDCTL_API=3 etcdctl get \
   --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/etcd/ca.pem \
   --cert=/etc/etcd/kubernetes.pem \
@@ -32,24 +37,24 @@ gcloud compute ssh controller-0 \
 00000010  73 2f 64 65 66 61 75 6c  74 2f 6b 75 62 65 72 6e  |s/default/kubern|
 00000020  65 74 65 73 2d 74 68 65  2d 68 61 72 64 2d 77 61  |etes-the-hard-wa|
 00000030  79 0a 6b 38 73 3a 65 6e  63 3a 61 65 73 63 62 63  |y.k8s:enc:aescbc|
-00000040  3a 76 31 3a 6b 65 79 31  3a 97 d1 2c cd 89 0d 08  |:v1:key1:..,....|
-00000050  29 3c 7d 19 41 cb ea d7  3d 50 45 88 82 a3 1f 11  |)<}.A...=PE.....|
-00000060  26 cb 43 2e c8 cf 73 7d  34 7e b1 7f 9f 71 d2 51  |&.C...s}4~...q.Q|
-00000070  45 05 16 e9 07 d4 62 af  f8 2e 6d 4a cf c8 e8 75  |E.....b...mJ...u|
-00000080  6b 75 1e b7 64 db 7d 7f  fd f3 96 62 e2 a7 ce 22  |ku..d.}....b..."|
-00000090  2b 2a 82 01 c3 f5 83 ae  12 8b d5 1d 2e e6 a9 90  |+*..............|
-000000a0  bd f0 23 6c 0c 55 e2 52  18 78 fe bf 6d 76 ea 98  |..#l.U.R.x..mv..|
-000000b0  fc 2c 17 36 e3 40 87 15  25 13 be d6 04 88 68 5b  |.,.6.@..%.....h[|
-000000c0  a4 16 81 f6 8e 3b 10 46  cb 2c ba 21 35 0c 5b 49  |.....;.F.,.!5.[I|
-000000d0  e5 27 20 4c b3 8e 6b d0  91 c2 28 f1 cc fa 6a 1b  |.' L..k...(...j.|
-000000e0  31 19 74 e7 a5 66 6a 99  1c 84 c7 e0 b0 fc 32 86  |1.t..fj.......2.|
-000000f0  f3 29 5a a4 1c d5 a4 e3  63 26 90 95 1e 27 d0 14  |.)Z.....c&...'..|
-00000100  94 f0 ac 1a cd 0d b9 4b  ae 32 02 a0 f8 b7 3f 0b  |.......K.2....?.|
-00000110  6f ad 1f 4d 15 8a d6 68  95 63 cf 7d 04 9a 52 71  |o..M...h.c.}..Rq|
-00000120  75 ff 87 6b c5 42 e1 72  27 b5 e9 1a fe e8 c0 3f  |u..k.B.r'......?|
-00000130  d9 04 5e eb 5d 43 0d 90  ce fa 04 a8 4a b0 aa 01  |..^.]C......J...|
-00000140  cf 6d 5b 80 70 5b 99 3c  d6 5c c0 dc d1 f5 52 4a  |.m[.p[.<.\....RJ|
-00000150  2c 2d 28 5a 63 57 8e 4f  df 0a                    |,-(ZcW.O..|
+00000040  3a 76 31 3a 6b 65 79 31  3a ef a1 50 52 26 2b e2  |:v1:key1:..PR&+.|
+00000050  09 8b 3b c5 24 1c 0e 37  bc 41 dd 36 f6 f8 9d ba  |..;.$..7.A.6....|
+00000060  77 17 c5 da b8 bc 9f e9  2b 09 86 94 ed 2f f9 04  |w.......+..../..|
+00000070  f6 f8 f0 f7 d8 dc 65 86  cb c0 a7 04 07 03 8f 03  |......e.........|
+00000080  52 2f 75 5e e6 ec 4f 37  b7 81 85 0b f4 57 6a 72  |R/u^..O7.....Wjr|
+00000090  b1 8c 2f 13 94 9b 28 32  f4 f8 47 db f6 25 39 f1  |../...(2..G..%9.|
+000000a0  de 42 7e 5e 80 d4 80 8c  23 1f d0 2e ee 23 15 40  |.B~^....#....#.@|
+000000b0  6e c8 c7 5f 85 27 51 cd  89 a0 e3 f8 db bf 23 18  |n.._.'Q.......#.|
+000000c0  05 d0 40 c8 97 a7 4e 63  4c 5f f0 41 3d 1c cd 74  |..@...NcL_.A=..t|
+000000d0  4f 1b fb b7 6d bf 9a 24  90 a3 5c 25 e9 4d ec 63  |O...m..$..\%.M.c|
+000000e0  a4 44 9f 10 c8 dd 8c 8f  e0 3a 65 68 d1 b3 5c fc  |.D.......:eh..\.|
+000000f0  dc d6 fb fe ce 64 f7 6e  a9 ee 26 11 24 a9 81 72  |.....d.n..&.$..r|
+00000100  09 cc cb 45 30 07 49 9d  16 ab 98 54 59 b5 b4 30  |...E0.I....TY..0|
+00000110  56 8f 8a 40 da 24 2d 57  b2 4f 86 64 07 26 df d7  |V..@.$-W.O.d.&..|
+00000120  01 70 e9 0a f8 d3 f8 72  72 de 0f 86 58 8e 29 85  |.p.....rr...X.).|
+00000130  fd 49 e3 83 4f d7 cd ee  db d7 86 13 cf 67 9b 65  |.I..O........g.e|
+00000140  70 1b f2 54 d6 72 b4 04  8a 9c 5e 04 c6 11 67 66  |p..T.r....^...gf|
+00000150  c4 6c f9 c1 dd 05 d9 5f  16 0a                    |.l....._..|
 0000015a
 ```
 
@@ -74,8 +79,8 @@ kubectl get pods -l app=nginx
 > output
 
 ```
-NAME                    READY   STATUS    RESTARTS   AGE
-nginx-f89759699-kpn5m   1/1     Running   0          10s
+NAME                     READY   STATUS    RESTARTS   AGE
+nginx-6799fc88d8-tq99b   1/1     Running   0          10s
 ```
 
 ### Port Forwarding
@@ -111,13 +116,13 @@ curl --head http://127.0.0.1:8080
 
 ```
 HTTP/1.1 200 OK
-Server: nginx/1.19.10
-Date: Sun, 02 May 2021 05:29:25 GMT
+Server: nginx/1.23.1
+Date: Thu, 01 Sep 2022 22:56:06 GMT
 Content-Type: text/html
-Content-Length: 612
-Last-Modified: Tue, 13 Apr 2021 15:13:59 GMT
+Content-Length: 615
+Last-Modified: Tue, 19 Jul 2022 14:05:27 GMT
 Connection: keep-alive
-ETag: "6075b537-264"
+ETag: "62d6ba27-267"
 Accept-Ranges: bytes
 ```
 
@@ -144,7 +149,7 @@ kubectl logs $POD_NAME
 
 ```
 ...
-127.0.0.1 - - [02/May/2021:05:29:25 +0000] "HEAD / HTTP/1.1" 200 0 "-" "curl/7.64.0" "-"
+127.0.0.1 - - [01/Sep/2022:22:56:06 +0000] "HEAD / HTTP/1.1" 200 0 "-" "curl/7.79.1" "-"
 ```
 
 ### Exec
@@ -160,7 +165,7 @@ kubectl exec -ti $POD_NAME -- nginx -v
 > output
 
 ```
-nginx version: nginx/1.19.10
+nginx version: nginx/1.23.1
 ```
 
 ## Services
@@ -185,16 +190,19 @@ NODE_PORT=$(kubectl get svc nginx \
 Create a firewall rule that allows remote access to the `nginx` node port:
 
 ```
-gcloud compute firewall-rules create kubernetes-the-hard-way-allow-nginx-service \
-  --allow=tcp:${NODE_PORT} \
-  --network kubernetes-the-hard-way
+aws ec2 authorize-security-group-ingress \
+  --group-id ${SECURITYGROUP} \
+  --protocol tcp \
+  --port ${NODE_PORT} \
+  --cidr 0.0.0.0/0
 ```
 
 Retrieve the external IP address of a worker instance:
 
 ```
-EXTERNAL_IP=$(gcloud compute instances describe worker-0 \
-  --format 'value(networkInterfaces[0].accessConfigs[0].natIP)')
+INSTANCE_NAME=$(kubectl get pod $POD_NAME --output=jsonpath='{.spec.nodeName}')
+
+
 ```
 
 Make an HTTP request using the external IP address and the `nginx` node port:
@@ -207,13 +215,13 @@ curl -I http://${EXTERNAL_IP}:${NODE_PORT}
 
 ```
 HTTP/1.1 200 OK
-Server: nginx/1.19.10
-Date: Sun, 02 May 2021 05:31:52 GMT
+Server: nginx/1.23.1
+Date: Thu, 01 Sep 2022 22:59:45 GMT
 Content-Type: text/html
-Content-Length: 612
-Last-Modified: Tue, 13 Apr 2021 15:13:59 GMT
+Content-Length: 615
+Last-Modified: Tue, 19 Jul 2022 14:05:27 GMT
 Connection: keep-alive
-ETag: "6075b537-264"
+ETag: "62d6ba27-267"
 Accept-Ranges: bytes
 ```
 

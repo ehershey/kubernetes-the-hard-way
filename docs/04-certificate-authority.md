@@ -112,10 +112,12 @@ Kubernetes uses a [special-purpose authorization mode](https://kubernetes.io/doc
 Generate a certificate and private key for each Kubernetes worker node:
 
 ```
-for instance in worker-0 worker-1 worker-2; do
+for i in 0 1 2; do
+  instance="worker-${i}"
+  instancename="ip-10-0-1-${i}"
 cat > ${instance}-csr.json <<EOF
 {
-  "CN": "system:node:${instance}",
+  "CN": "system:node:${instancename}",
   "key": {
     "algo": "rsa",
     "size": 2048
@@ -132,17 +134,21 @@ cat > ${instance}-csr.json <<EOF
 }
 EOF
 
-EXTERNAL_IP=$(gcloud compute instances describe ${instance} \
-  --format 'value(networkInterfaces[0].accessConfigs[0].natIP)')
+EXTERNAL_IP=$(aws ec2 describe-instances --filters \
+    "Name=tag:Name,Values=${instance}" \
+    "Name=instance-state-name,Values=running" \
+    --output text --query 'Reservations[].Instances[].PublicIpAddress')
 
-INTERNAL_IP=$(gcloud compute instances describe ${instance} \
-  --format 'value(networkInterfaces[0].networkIP)')
+INTERNAL_IP=$(aws ec2 describe-instances --filters \
+    "Name=tag:Name,Values=${instance}" \
+    "Name=instance-state-name,Values=running" \
+    --output text --query 'Reservations[].Instances[].PrivateIpAddress')
 
 cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=${instance},${EXTERNAL_IP},${INTERNAL_IP} \
+  -hostname=${instancename},${EXTERNAL_IP},${INTERNAL_IP} \
   -profile=kubernetes \
   ${instance}-csr.json | cfssljson -bare ${instance}
 done
@@ -201,7 +207,6 @@ Results:
 kube-controller-manager-key.pem
 kube-controller-manager.pem
 ```
-
 
 ### The Kube Proxy Client Certificate
 
@@ -289,7 +294,6 @@ kube-scheduler-key.pem
 kube-scheduler.pem
 ```
 
-
 ### The Kubernetes API Server Certificate
 
 The `kubernetes-the-hard-way` static IP address will be included in the list of subject alternative names for the Kubernetes API Server certificate. This will ensure the certificate can be validated by remote clients.
@@ -298,10 +302,6 @@ Generate the Kubernetes API Server certificate and private key:
 
 ```
 {
-
-KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
-  --region $(gcloud config get-value compute/region) \
-  --format 'value(address)')
 
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
@@ -328,7 +328,7 @@ cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=10.32.0.1,10.240.0.10,10.240.0.11,10.240.0.12,${KUBERNETES_PUBLIC_ADDRESS},127.0.0.1,${KUBERNETES_HOSTNAMES} \
+  -hostname=10.32.0.1,10.0.1.10,10.0.1.11,10.0.1.12,${KUBERNETES_PUBLIC_ADDRESS},127.0.0.1,${KUBERNETES_HOSTNAMES} \
   -profile=kubernetes \
   kubernetes-csr.json | cfssljson -bare kubernetes
 
@@ -389,14 +389,18 @@ service-account-key.pem
 service-account.pem
 ```
 
-
 ## Distribute the Client and Server Certificates
 
 Copy the appropriate certificates and private keys to each worker instance:
 
 ```
 for instance in worker-0 worker-1 worker-2; do
-  gcloud compute scp ca.pem ${instance}-key.pem ${instance}.pem ${instance}:~/
+  external_ip=$(aws ec2 describe-instances --filters \
+    "Name=tag:Name,Values=${instance}" \
+    "Name=instance-state-name,Values=running" \
+    --output text --query 'Reservations[].Instances[].PublicIpAddress')
+
+  scp -i kubernetes.rsa ca.pem ${instance}-key.pem ${instance}.pem ubuntu@${external_ip}:~/
 done
 ```
 
@@ -404,8 +408,14 @@ Copy the appropriate certificates and private keys to each controller instance:
 
 ```
 for instance in controller-0 controller-1 controller-2; do
-  gcloud compute scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
-    service-account-key.pem service-account.pem ${instance}:~/
+  external_ip=$(aws ec2 describe-instances --filters \
+    "Name=tag:Name,Values=${instance}" \
+    "Name=instance-state-name,Values=running" \
+    --output text --query 'Reservations[].Instances[].PublicIpAddress')
+
+  scp -i kubernetes.rsa \
+    ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
+    service-account-key.pem service-account.pem ubuntu@${external_ip}:~/
 done
 ```
 

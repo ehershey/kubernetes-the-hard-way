@@ -31,8 +31,8 @@ kubectl get pods -l k8s-app=kube-dns -n kube-system
 
 ```
 NAME                       READY   STATUS    RESTARTS   AGE
-coredns-8494f9c688-hh7r2   1/1     Running   0          10s
-coredns-8494f9c688-zqrj2   1/1     Running   0          10s
+coredns-8494f9c688-mqt4k   0/1     Running   0          16s
+coredns-8494f9c688-pjpft   0/1     Running   0          16s
 ```
 
 ## Verification
@@ -53,7 +53,7 @@ kubectl get pods -l run=busybox
 
 ```
 NAME      READY   STATUS    RESTARTS   AGE
-busybox   1/1     Running   0          3s
+busybox   1/1     Running   0          12s
 ```
 
 Retrieve the full name of the `busybox` pod:

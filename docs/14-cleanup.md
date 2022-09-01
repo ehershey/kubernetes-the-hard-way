@@ -19,45 +19,59 @@ Delete the external load balancer network resources:
 
 ```
 {
-  gcloud -q compute forwarding-rules delete kubernetes-forwarding-rule \
-    --region $(gcloud config get-value compute/region)
+echo "Kill the worker nodes... " && \
+aws ec2 terminate-instances \
+  --instance-ids \
+    $(aws ec2 describe-instances --filters \
+      "Name=tag:Name,Values=worker-0,worker-1,worker-2" \
+      "Name=instance-state-name,Values=running" \
+      --output text --query 'Reservations[].Instances[].InstanceId')
 
-  gcloud -q compute target-pools delete kubernetes-target-pool
+echo "Some worker nodes take forever to die... " && \
+aws ec2 wait instance-terminated \
+  --instance-ids \
+    $(aws ec2 describe-instances \
+      --filter "Name=tag:Name,Values=worker-0,worker-1,worker-2" \
+      --output text --query 'Reservations[].Instances[].InstanceId')
 
-  gcloud -q compute http-health-checks delete kubernetes
+echo "Issuing shutdown to the controllers... " && \
+aws ec2 terminate-instances \
+  --instance-ids \
+    $(aws ec2 describe-instances --filter \
+      "Name=tag:Name,Values=controller-0,controller-1,controller-2" \
+      "Name=instance-state-name,Values=running" \
+      --output text --query 'Reservations[].Instances[].InstanceId')
 
-  gcloud -q compute addresses delete kubernetes-the-hard-way
+echo "Controllers waiting to die..." && \
+aws ec2 wait instance-terminated \
+  --instance-ids \
+    $(aws ec2 describe-instances \
+      --filter "Name=tag:Name,Values=controller-0,controller-1,controller-2" \
+      --output text --query 'Reservations[].Instances[].InstanceId')
+
+aws ec2 delete-key-pair --key-name kubernetes
 }
 ```
 
-Delete the `kubernetes-the-hard-way` firewall rules:
-
-```
-gcloud -q compute firewall-rules delete \
-  kubernetes-the-hard-way-allow-nginx-service \
-  kubernetes-the-hard-way-allow-internal \
-  kubernetes-the-hard-way-allow-external \
-  kubernetes-the-hard-way-allow-health-check
-```
-
-Delete the `kubernetes-the-hard-way` network VPC:
+Delete the `kubernetes-the-hard-way` networking nonsense:
 
 ```
 {
-  gcloud -q compute routes delete \
-    kubernetes-route-10-200-0-0-24 \
-    kubernetes-route-10-200-1-0-24 \
-    kubernetes-route-10-200-2-0-24
+aws elbv2 delete-load-balancer --load-balancer-arn "${LOADBALANCER}"
+aws elbv2 delete-target-group --target-group-arn "${TARGETGROUP}"
+aws ec2 delete-security-group --group-id "${SECURITYGROUP}"
+ROUTE_TABLE_ASSOCIATION_ID="$(aws ec2 describe-route-tables \
+  --route-table-ids "${ROUTETABLE}" \
+  --output text --query 'RouteTables[].Associations[].RouteTableAssociationId')"
+aws ec2 disassociate-route-table --association-id "${ROUTE_TABLE_ASSOCIATION_ID}"
+aws ec2 delete-route-table --route-table-id "${ROUTETABLED}"
+echo "Waiting a minute for all public address(es) to be unmapped.. " && sleep 60
 
-  gcloud -q compute networks subnets delete kubernetes
-
-  gcloud -q compute networks delete kubernetes-the-hard-way
+aws ec2 detach-internet-gateway \
+  --internet-gateway-id "${INTERNETGW}" \
+  --vpc-id "${VPC_ID}"
+aws ec2 delete-internet-gateway --internet-gateway-id "${INTERNETGW}"
+aws ec2 delete-subnet --subnet-id "${SUBNET}"
+aws ec2 delete-vpc --vpc-id "${VPC}"
 }
-```
-
-Delete the `kubernetes-the-hard-way` compute address:
-
-```
-gcloud -q compute addresses delete kubernetes-the-hard-way \
-  --region $(gcloud config get-value compute/region)
 ```

@@ -12,24 +12,24 @@ Generate a kubeconfig file suitable for authenticating as the `admin` user:
 
 ```
 {
-  KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
-    --region $(gcloud config get-value compute/region) \
-    --format 'value(address)')
+PUBLICADDRESS=$(aws elbv2 describe-load-balancers \
+--load-balancer-arns ${LOADBALANCER} \
+--output text --query 'LoadBalancers[].DNSName')
 
-  kubectl config set-cluster kubernetes-the-hard-way \
-    --certificate-authority=ca.pem \
-    --embed-certs=true \
-    --server=https://${KUBERNETES_PUBLIC_ADDRESS}:6443
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.pem \
+  --embed-certs=true \
+  --server=https://${PUBLICADDRESS}:443
 
-  kubectl config set-credentials admin \
-    --client-certificate=admin.pem \
-    --client-key=admin-key.pem
+kubectl config set-credentials admin \
+  --client-certificate=admin.pem \
+  --client-key=admin-key.pem
 
-  kubectl config set-context kubernetes-the-hard-way \
-    --cluster=kubernetes-the-hard-way \
-    --user=admin
+kubectl config set-context kubernetes-the-hard-way \
+  --cluster=kubernetes-the-hard-way \
+  --user=admin
 
-  kubectl config use-context kubernetes-the-hard-way
+kubectl config use-context kubernetes-the-hard-way
 }
 ```
 
@@ -57,10 +57,10 @@ kubectl get nodes
 > output
 
 ```
-NAME       STATUS   ROLES    AGE     VERSION
-worker-0   Ready    <none>   2m35s   v1.21.0
-worker-1   Ready    <none>   2m35s   v1.21.0
-worker-2   Ready    <none>   2m35s   v1.21.0
+NAME           STATUS   ROLES    AGE   VERSION
+ip-10-0-1-20   Ready    <none>   17m   v1.21.0
+ip-10-0-1-21   Ready    <none>   17m   v1.21.0
+ip-10-0-1-22   Ready    <none>   17m   v1.21.0
 ```
 
 Next: [Provisioning Pod Network Routes](11-pod-network-routes.md)

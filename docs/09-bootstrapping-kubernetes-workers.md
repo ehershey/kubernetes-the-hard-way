@@ -7,7 +7,14 @@ In this lab you will bootstrap three Kubernetes worker nodes. The following comp
 The commands in this lab must be run on each worker instance: `worker-0`, `worker-1`, and `worker-2`. Login to each worker instance using the `gcloud` command. Example:
 
 ```
-gcloud compute ssh worker-0
+for instance in worker-0 worker-1 worker-2; do
+  external_ip=$(aws ec2 describe-instances --filters \
+    "Name=tag:Name,Values=${instance}" \
+    "Name=instance-state-name,Values=running" \
+    --output text --query 'Reservations[].Instances[].PublicIpAddress')
+
+  echo ssh -i kubernetes.rsa ubuntu@$external_ip
+done
 ```
 
 ### Running commands in parallel with tmux
@@ -79,7 +86,7 @@ Install the worker binaries:
   tar -xvf containerd-1.4.4-linux-amd64.tar.gz -C containerd
   sudo tar -xvf cni-plugins-linux-amd64-v0.9.1.tgz -C /opt/cni/bin/
   sudo mv runc.amd64 runc
-  chmod +x crictl kubectl kube-proxy kubelet runc 
+  chmod +x crictl kubectl kube-proxy kubelet runc
   sudo mv crictl kubectl kube-proxy kubelet runc /usr/local/bin/
   sudo mv containerd/bin/* /bin/
 }
@@ -90,8 +97,9 @@ Install the worker binaries:
 Retrieve the Pod CIDR range for the current compute instance:
 
 ```
-POD_CIDR=$(curl -s -H "Metadata-Flavor: Google" \
-  http://metadata.google.internal/computeMetadata/v1/instance/attributes/pod-cidr)
+POD_CIDR=$(curl -s http://169.254.169.254/latest/user-data/ \
+  | tr "|" "\n" | grep "^pod-cidr" | cut -d"=" -f2)
+echo "${POD_CIDR}"
 ```
 
 Create the `bridge` network configuration file:
@@ -177,11 +185,13 @@ EOF
 ### Configure the Kubelet
 
 ```
-{
-  sudo mv ${HOSTNAME}-key.pem ${HOSTNAME}.pem /var/lib/kubelet/
-  sudo mv ${HOSTNAME}.kubeconfig /var/lib/kubelet/kubeconfig
-  sudo mv ca.pem /var/lib/kubernetes/
-}
+WORKER_NAME=$(curl -s http://169.254.169.254/latest/user-data/ \
+| tr "|" "\n" | grep "^name" | cut -d"=" -f2)
+echo "${WORKER_NAME}"
+
+sudo mv ${WORKER_NAME}-key.pem ${WORKER_NAME}.pem /var/lib/kubelet/
+sudo mv ${WORKER_NAME}.kubeconfig /var/lib/kubelet/kubeconfig
+sudo mv ca.pem /var/lib/kubernetes/
 ```
 
 Create the `kubelet-config.yaml` configuration file:
@@ -205,12 +215,12 @@ clusterDNS:
 podCIDR: "${POD_CIDR}"
 resolvConf: "/run/systemd/resolve/resolv.conf"
 runtimeRequestTimeout: "15m"
-tlsCertFile: "/var/lib/kubelet/${HOSTNAME}.pem"
-tlsPrivateKeyFile: "/var/lib/kubelet/${HOSTNAME}-key.pem"
+tlsCertFile: "/var/lib/kubelet/${WORKER_NAME}.pem"
+tlsPrivateKeyFile: "/var/lib/kubelet/${WORKER_NAME}-key.pem"
 EOF
 ```
 
-> The `resolvConf` configuration is used to avoid loops when using CoreDNS for service discovery on systems running `systemd-resolved`. 
+> The `resolvConf` configuration is used to avoid loops when using CoreDNS for service discovery on systems running `systemd-resolved`.
 
 Create the `kubelet.service` systemd unit file:
 
@@ -284,7 +294,7 @@ EOF
 {
   sudo systemctl daemon-reload
   sudo systemctl enable containerd kubelet kube-proxy
-  sudo systemctl start containerd kubelet kube-proxy
+  sudo systemctl restart containerd kubelet kube-proxy
 }
 ```
 
@@ -297,8 +307,12 @@ EOF
 List the registered Kubernetes nodes:
 
 ```
-gcloud compute ssh controller-0 \
-  --command "kubectl get nodes --kubeconfig admin.kubeconfig"
+external_ip=$(aws ec2 describe-instances --filters \
+    "Name=tag:Name,Values=controller-0" \
+    "Name=instance-state-name,Values=running" \
+    --output text --query 'Reservations[].Instances[].PublicIpAddress')
+
+ssh -i kubernetes.rsa ubuntu@${external_ip} kubectl get nodes --kubeconfig admin.kubeconfig
 ```
 
 > output
