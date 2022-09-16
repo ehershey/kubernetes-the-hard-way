@@ -114,7 +114,7 @@ Generate a certificate and private key for each Kubernetes worker node:
 ```
 for i in 0 1 2; do
   instance="worker-${i}"
-  instancename="ip-10-0-1-${i}"
+  instancename="ip-10-0-1-2${i}"
 cat > ${instance}-csr.json <<EOF
 {
   "CN": "system:node:${instancename}",
@@ -143,6 +143,8 @@ INTERNAL_IP=$(aws ec2 describe-instances --filters \
     "Name=tag:Name,Values=${instance}" \
     "Name=instance-state-name,Values=running" \
     --output text --query 'Reservations[].Instances[].PrivateIpAddress')
+
+echo "-hostname=${instancename},${EXTERNAL_IP},${INTERNAL_IP}"
 
 cfssl gencert \
   -ca=ca.pem \
@@ -328,7 +330,7 @@ cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=10.32.0.1,10.0.1.10,10.0.1.11,10.0.1.12,${KUBERNETES_PUBLIC_ADDRESS},127.0.0.1,${KUBERNETES_HOSTNAMES} \
+  -hostname=10.32.0.1,10.0.1.10,10.0.1.11,10.0.1.12,${PUBLICADDRESS},127.0.0.1,${KUBERNETES_HOSTNAMES} \
   -profile=kubernetes \
   kubernetes-csr.json | cfssljson -bare kubernetes
 

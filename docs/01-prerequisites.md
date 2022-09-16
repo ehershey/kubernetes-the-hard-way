@@ -38,7 +38,7 @@ Then be sure to authorize gcloud to access the Cloud Platform with your Google u
 
 > The use of tmux is optional and not required to complete this tutorial.
 
-![tmux screenshot](images/tmux-screenshot.png)
+![tmux screenshot](images/tmux-screenshot.png) // TODO fix screenshot
 
 > Enable synchronize-panes by pressing `ctrl+b` followed by `shift+:`. Next type `set synchronize-panes on` at the prompt. To disable synchronization: `set synchronize-panes off`.
 
